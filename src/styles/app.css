@@ -1,0 +1,545 @@
+/* ─────────────────────────────────────────────────────────────
+   new-14 · Ostro · style.css
+   One face (Inter Tight 400/500), fluid root, jonhowell.com type ladder,
+   black hero → white page through one polarity scalar (--pol), glass
+   without strokes, blur-driven reveals gated behind state classes.
+   Spec + rationale: DESIGN.md.
+
+   Layer order, declared once. Later layers win without specificity fights;
+   anything unlayered wins over everything (keep that rare: @font-face and
+   the reduced-motion block only).
+   ───────────────────────────────────────────────────────────── */
+@layer reset, tokens, base, layout, components, motion, utilities;
+
+/* Inter Tight 400/500 — @font-face lives in fonts/inter-tight.css. This is
+   the metric-matched fallback so the page does not reflow when the font
+   lands. Inter Tight vertical metrics: ascender 2728 / descender −680 / UPM 2816. */
+@font-face {
+  font-family: 'Inter Tight Fallback';
+  src: local('Arial');
+  ascent-override: 96.88%;
+  descent-override: 24.15%;
+  line-gap-override: 0%;
+  size-adjust: 100%;
+}
+
+@layer reset {
+  *, ::before, ::after { box-sizing: border-box; margin: 0; padding: 0; border: 0 solid; }
+  html, body { width: 100%; overscroll-behavior: none; }
+  img, svg, video, canvas, iframe { display: block; max-width: 100%; }
+  [hidden] { display: none; }                     /* the symbol sheet must not take height */
+  img, video { height: auto; }
+  button, input, select, textarea { font: inherit; letter-spacing: inherit; color: inherit; background: none; }
+  button { cursor: pointer; }
+  ul, ol { list-style: none; }
+  a { color: inherit; text-decoration: none; }
+  h1, h2, h3, h4, h5, h6 { font-size: inherit; font-weight: inherit; }
+  :focus:not(:focus-visible) { outline: none; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+}
+
+@layer tokens {
+  :root {
+    /* ── the two colours; everything on screen is a mix of them ── */
+    --k: #000;
+    --w: #fff;
+    --soft: #f1f1f1;                 /* the light widget/card fill of screens 2 and 4 */
+
+    /* ── type ladder (jonhowell.com → Inter Tight) — rem on the fluid root ── */
+    --w-text: 400;                   /* body, descriptions, captions */
+    --w-ui:   500;                   /* display, statement, nav, buttons */
+
+    --fs-display:   2.75rem;         /* md 4.5rem  → 79px @1440 */
+    --fs-statement: 1.75rem;         /* md 2.5rem  → 44px */
+    --fs-price:     1.5rem;          /* 26px */
+    --fs-body:      1.125rem;        /* 20px */
+    --fs-body-sm:   .9375rem;        /* 16.5px */
+    --fs-ui:        1rem;            /* 17.5px */
+    --fs-caption:   .875rem;         /* 15px */
+
+    --lh-display: .95;  --lh-statement: 1.15;  --lh-price: 1;  --lh-body: 1.3;  --lh-body-sm: 1.25;  --lh-ui: 1;  --lh-caption: 1.2;
+    --ls-display: -.04em;  --ls-statement: -.03em;  --ls-price: -.02em;  --ls-body: 0;  --ls-ui: -.01em;  --ls-caption: 0;
+
+    /* ── shape ── */
+    --radius:      12px;             /* buttons (44px tall → ~27%) with corner-shape: squircle (Apple / Figma 60%);
+                                        8px read as sharp once the corners went continuous */
+    --radius-card: 1.5rem;           /* the widget cards of screen 4 */
+    --btn-h:       2.75rem;
+    --glass-blur:  12px;
+
+    /* ── motion ── */
+    --ease-magic:    cubic-bezier(.33, 0, 0, 1);      /* UI, hovers, widget swap */
+    --ease-out-expo: cubic-bezier(.19, 1, .22, 1);    /* headline reveals, slider */
+    --ease-expo:     cubic-bezier(.16, 1, .3, 1);     /* blur reveals (house default) */
+    --ease-quart:    cubic-bezier(.41, .35, .2, 1);   /* images */
+    --ease-out:      cubic-bezier(0, 0, .2, 1);       /* button :active */
+
+    --dur-tap: .2s;  --dur-mid: .6s;  --dur-body: .7s;  --dur-reveal: .9s;  --dur-image: 1.2s;  --dur-line: 1.4s;  --dur-word: 1.6s;
+    --step-line: 50ms;  --step-word: 75ms;  --step-reveal: 90ms;
+    --split-mask-pad: .08em;  --split-mask-bleed-y: .3em;
+
+    /* ── spacing / geometry ── */
+    --u: .25rem;
+    --pad-x: clamp(1rem, 2.18vw, 2.5rem);            /* 32px @1470 */
+    --gap-grid: 1.25rem;
+
+    /* the media plate: 16:9, 100vw wide, centred on the viewport. Every other
+       state is scale + translate + clip of that one box. */
+    --plate-w: 100vw;
+    --plate-h: 56.25vw;
+    --card-w: 33.5vw;                /* a car in the row (screen 3) */
+    --s2: .335;                      /* = card-w / plate-w, the row scale of the 16:9 box */
+    --pitch-row: 28.57vw;            /* row spacing, centre to centre */
+    --pitch-full: 72vw;              /* slider spacing: a car leaving at |d| .75 is off-screen before it is gone */
+    --row-dy: 44svh;                 /* the row lands ON the bottom edge (car body bottom ≈ viewport bottom) */
+    --par-dy: 46svh;                 /* …and rises this much over [yC, yC + 1.4H]: the bodies reach the statement's
+                                        last line at par ≈ .65 (p ≈ .9, the last two words), then cover it while it fades */
+    --full-dy: 44svh;                /* = par-dy − 2svh → full car centre = 50svh − 2svh ≈ mock 459px */
+    @media (max-width: 47.99rem) { & {
+      --card-w: 58vw; --s2: .58; --pitch-row: 50vw; --pitch-full: 100vw;   /* three cars in the row, one card per screen */
+      --row-dy: 42svh; --par-dy: 40svh;
+      --full-dy: 22svh;              /* the presented car sits in the upper half, clear of the widget stack */
+    } }
+
+    /* section heights — lib/beats.js overrides these from the beat table */
+    --hold: 60svh;
+    --about-exit: 50svh;
+    --cat-run: 640svh;
+
+    --z-header: 60;
+
+    /* ── page ink: the page is always white with black ink. These are the static
+          defaults; the header re-derives the same names from its own --pol. ── */
+    --ink: var(--k);
+    --plate: var(--w);
+    --ink-55: color-mix(in srgb, var(--ink) 55%, transparent);
+    --ink-40: color-mix(in srgb, var(--ink) 40%, transparent);
+    --ink-20: color-mix(in srgb, var(--ink) 20%, transparent);
+    --ink-10: color-mix(in srgb, var(--ink) 10%, transparent);
+    --ink-06: color-mix(in srgb, var(--ink) 6%, transparent);
+    --glass:       color-mix(in srgb, var(--ink) 8%, transparent);
+    --glass-hover: color-mix(in srgb, var(--ink) 14%, transparent);
+  }
+  @media (min-width: 48rem) {
+    :root {
+      --fs-display: 4.5rem;
+      --fs-statement: 2.5rem;
+    }
+  }
+
+  /* ── polarity: one scalar flips the header's chrome (white over the dark clip,
+        black over the white page). Declared on the .pol root itself and NEVER as
+        --pol on :root — an unregistered custom property substitutes where it is
+        declared, so a :root copy would freeze at 0. ── */
+  .pol {
+    --pol: 0;
+    --ink:    color-mix(in srgb, var(--w), var(--k) calc(var(--pol) * 100%));
+    --plate:  color-mix(in srgb, var(--k), var(--w) calc(var(--pol) * 100%));
+    --ink-55: color-mix(in srgb, var(--ink) 55%, transparent);
+    --ink-40: color-mix(in srgb, var(--ink) 40%, transparent);
+    --ink-20: color-mix(in srgb, var(--ink) 20%, transparent);
+    --ink-10: color-mix(in srgb, var(--ink) 10%, transparent);
+    --ink-06: color-mix(in srgb, var(--ink) 6%, transparent);
+    --glass:       color-mix(in srgb, var(--ink) 8%, transparent);
+    --glass-hover: color-mix(in srgb, var(--ink) 14%, transparent);
+  }
+}
+
+@layer base {
+  html { font-size: 15px; }
+  @media (min-width: 640px)  { html { font-size: clamp(15px, 12.9574px + .3191vw, 18px); } }
+  @media (min-width: 1580px) { html { font-size: clamp(18px, 1.1765vw - .5882px, 22px); } }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+    background: var(--w);
+  }
+  body {
+    font-family: 'Inter Tight', 'Inter Tight Fallback', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: var(--w-text);
+    line-height: 1.5;
+    background-color: var(--w);
+    color: var(--k);
+  }
+  ::selection { background-color: var(--ink); color: var(--plate); text-shadow: none; }
+
+  /* Lenis (lenis.css 1.3.17, inlined) */
+  html.lenis, html.lenis body { height: auto; }
+  .lenis:not(.lenis-autoToggle).lenis-stopped { overflow: clip; }
+  .lenis [data-lenis-prevent], .lenis [data-lenis-prevent-wheel], .lenis [data-lenis-prevent-touch] { overscroll-behavior: contain; }
+  .lenis.lenis-smooth iframe { pointer-events: none; }
+  .lenis.lenis-autoToggle { transition-property: overflow; transition-duration: 1ms; transition-behavior: allow-discrete; }
+}
+
+@layer layout {
+  .px-global { padding-inline: var(--pad-x); }
+
+  /* ── stage + scene ── */
+  .stage { position: relative; }
+  .stage__scene {
+    position: sticky; top: 0; height: 100lvh; margin-bottom: -100lvh;
+    overflow: hidden; z-index: 0;
+    background: var(--w);
+  }
+  .stage > section { position: relative; z-index: 1; }
+
+  .row { position: absolute; inset: 0; --rin: 0; --par: 0; --zoom: 0; }
+
+  /* the box: 16:9 plate centred on the viewport. JS writes the keyframes as px /
+     numbers (--x0 … --s2), the scrubbed 0→1 legs (--g1 --g2 --zoom) and the slider
+     distance (--d); CSS chains them into one transform. Registration of the
+     cut-out on the last frame is by construction: both layers fill this box. */
+  .car {
+    position: absolute; left: 50%; top: 50%;
+    width: var(--plate-w); height: var(--plate-h);
+    margin: calc(var(--plate-h) / -2) 0 0 calc(var(--plate-w) / -2);
+    transform-origin: 50% 50%;
+    --g1: 0; --g2: 0; --d: 0; --vis: 1;
+    --x0: 0px; --y0: 0px; --s0: 1;
+    --x1: 0px; --y1: 0px; --s1: 1; --cx1: 0%; --cy1: 0%;
+    --y2: var(--row-dy); --y3: var(--full-dy);
+    --dir: 0; --rise: 1;             /* --rise: neighbours also come up into the row (0 on the media box) */
+    --pitch: calc(var(--pitch-row) + (var(--pitch-full) - var(--pitch-row)) * var(--zoom));
+    --hump: calc((1 - cos(clamp(-1, var(--d), 1) * 3.14159rad)) * .5);   /* 0 at rest, 1 half-way */
+    --sx: calc((var(--s0) + (var(--s1) - var(--s0)) * var(--g1) + (var(--s2) - var(--s1)) * var(--g2) + (1 - var(--s2)) * var(--zoom)) * (.92 + .08 * var(--vis)) * (1 - var(--zoom) * var(--hump) * .03));
+    /* x is mirrored (−d): "next" drives the current car OUT to the right and the
+       next one in from the left — the car reads as moving forward */
+    --tx: calc(var(--x0) + (var(--x1) - var(--x0)) * var(--g1) + (0px - var(--x1)) * var(--g2)
+               - var(--d) * var(--pitch)
+               - var(--dir) * (1 - var(--rin)) * 12vw
+               - (.5 - var(--par)) * var(--d) * 3vw);
+    --ty: calc(var(--y0) + (var(--y1) - var(--y0)) * var(--g1) + (var(--y2) - var(--y1)) * var(--g2) + (var(--y3) - var(--y2)) * var(--zoom)
+               + var(--rise) * (1 - var(--rin)) * 6svh
+               - var(--par) * var(--par-dy)
+               + var(--zoom) * var(--hump) * 1svh);
+    --gc: calc(var(--g1) * (1 - var(--g2)));
+    transform: translate(var(--tx), var(--ty)) scale(var(--sx));
+    clip-path: inset(calc(var(--gc) * var(--cy1)) calc(var(--gc) * var(--cx1)) round calc(var(--g1) * var(--radius-card) / var(--s1)));
+    will-change: transform;
+  }
+  /* the media box is car 0: it starts at x0/y0/s0 (cover), the others rest at
+     their row / slider offsets and only exist from the row-in on */
+  .media { --dis: 0; --rise: 0; --x0: 0px; --y0: 0px; }
+  .car:not(.media) { --x0: 0px; --y0: var(--row-dy); --s0: var(--s2); --x1: 0px; --y1: var(--row-dy); --s1: var(--s2); --g1: 1; --g2: 1; }
+  .media__video, .media__cut, .car__cut {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  .media__video { opacity: calc(1 - var(--dis)); background: var(--k); }
+  .media__cut { opacity: var(--dis); color: #1c1c21; }
+  .car__cut { color: var(--tint, #1c1c21); }
+  .car:not(.media) { opacity: calc(var(--rin) * var(--vis)); }
+  .media { opacity: var(--vis); }                 /* the media box leaves like any other car in the slider */
+  .car.is-hidden { visibility: hidden; }
+
+  /* ── screen 1 · hero chrome ── */
+  .hero {
+    position: relative; height: 100lvh;
+    pointer-events: none;
+    color: var(--w);                              /* the hero chrome lives on the clip: always white */
+    --ink: var(--w); --ink-40: rgba(255,255,255,.4); --glass: rgba(255,255,255,.12);
+  }
+  .hero > * { pointer-events: auto; }
+  .hero__side {
+    position: absolute; left: var(--pad-x); top: 50%;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2.5rem;
+    max-width: 19em;
+    translate: 0 -50%;
+  }
+  .hero__desc { text-wrap: pretty; }
+  .hero__hint {
+    position: absolute; left: var(--pad-x); bottom: 2.25rem;
+    display: inline-flex; align-items: center; gap: .5rem;
+  }
+  .hero__hint .bi { font-size: 1.05em; }
+  /* "Premium" starts on the header's "Scroll" line (lib/hero.js measures it →
+     --title-left); "Car / Rental" stays on the right margin */
+  .hero__title {
+    position: absolute; left: var(--title-left, 54vw); right: var(--pad-x); bottom: 2.25rem;
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 1.2em;
+    white-space: nowrap;
+  }
+  @media (max-width: 47.99rem) {
+    .hero__title { left: var(--pad-x); }
+    .hero__hint { display: none; }
+    .hero__side { top: 44%; max-width: 17em; }
+  }
+  .hero__ghost { color: var(--ink-40); }
+  .hero__main { display: block; }
+
+  /* ── screen 2 · about (skeleton; filled on stage 2) ── */
+  .about { height: calc(100svh + var(--hold) + var(--about-exit)); }
+  .about__pin {
+    position: sticky; top: 0; height: 100svh;
+    display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--gap-grid);
+    padding-inline: var(--pad-x);
+    pointer-events: none;
+  }
+  .about__pin > * { pointer-events: auto; }
+  /* the empty slot the clip lands in — measured by lib/media.js, never painted.
+     Screen 2 @1470×956: x 32–736, y 195–653 → col 1–6, top 20.4svh, height 47.9svh. */
+  .about__slot { grid-column: 1 / 7; margin-top: 20.4svh; height: 47.9svh; pointer-events: none; }
+  .about__copy {
+    grid-column: 7 / 13; margin-top: 20.4svh; height: 47.9svh;
+    display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;
+  }
+  .about__statement { text-wrap: pretty; max-width: 15.5em; }
+  .about__marquee { position: absolute; inset-inline: 0; bottom: 3.2svh; }
+  @media (max-width: 47.99rem) {
+    .about__pin { align-content: start; row-gap: 0; }
+    .about__slot { grid-column: 1 / -1; margin-top: 12svh; height: 52vw; }
+    .about__copy { grid-column: 1 / -1; margin-top: 2.5svh; height: auto; justify-content: flex-start; gap: 1.25rem; }
+    .about__statement { max-width: none; }
+  }
+
+  /* ── screens 3–5 · catalog (skeleton; filled on stages 3–5) ── */
+  .catalog { height: calc(100svh + var(--cat-run)); }
+  .catalog__screen { position: sticky; top: 0; height: 100svh; pointer-events: none; }
+  .catalog__screen > * { pointer-events: auto; }
+  /* screen 3 statement: centred in the scene, UNDER the row (the cars ride over its
+     last lines as they rise) — mock: x 430–1040, y 365–560 @1470×956 */
+  .catalog__words {
+    position: absolute; left: 50%; top: 47svh; width: 41.5vw; max-width: 44rem;
+    text-align: center; text-wrap: balance; pointer-events: none; z-index: 0;
+    color: var(--k);
+  }
+  @media (max-width: 47.99rem) { .catalog__words { width: 88vw; top: 40svh; } }
+
+  /* screen 4 widgets (mock @1470×956: y 743–923, ‹ 90 · main · loc 156 · price 160 · › 90, gap 10) */
+  .widgets {
+    position: absolute; inset-inline: var(--pad-x); bottom: 3.4svh;
+    display: flex; gap: 10px; height: min(180px, 18.8svh);
+  }
+  .widget {
+    background: var(--soft); color: var(--k);
+    border-radius: var(--radius-card);
+    display: flex; flex-direction: column; justify-content: center; align-items: center; gap: .6rem;
+  }
+  .widget--arrow { flex: 0 0 90px; font-size: 1.4rem; color: var(--k); transition: background-color var(--dur-tap) var(--ease-magic); cursor: pointer; }
+  @media (hover: hover) and (pointer: fine) { .widget--arrow:hover { background: #e8e8e8; } }
+  .widget--arrow:active { transform: scale(.98); }
+  .widget--main { flex: 1 1 auto; align-items: stretch; justify-content: space-between; padding: 1.7rem 1.8rem 1.5rem; gap: 1rem; }
+  .widget__row { display: flex; align-items: flex-end; justify-content: space-between; gap: 2rem; }
+  .widget__desc { max-width: 20em; text-wrap: balance; }   /* two even lines, every car */
+  .widget--loc { flex: 0 0 156px; }
+  .widget--price { flex: 0 0 160px; gap: .35rem; }
+  .widget__price { margin-bottom: .45rem; }
+  .btn--card { background: #e2e2e2; color: var(--k); }
+  @media (hover: hover) and (pointer: fine) { .btn--card:hover { background: #d8d8d8; } }
+  .pill--card { background: #e2e2e2; -webkit-backdrop-filter: none; backdrop-filter: none; color: var(--k); }
+  @media (max-width: 47.99rem) {
+    .widgets { flex-wrap: wrap; height: auto; bottom: 2svh; gap: 8px; }
+    .widget--main { order: 1; flex-basis: 100%; padding: 1.2rem 1.25rem 1.1rem; gap: .8rem; }
+    .widget--main .widget__row { align-items: flex-end; gap: 1rem; }
+    .widget--loc, .widget--price { order: 2; flex: 1 1 calc(50% - 4px); height: auto; padding: 1rem .75rem; gap: .3rem; }
+    .widget--loc { flex-direction: row; flex-wrap: wrap; gap: .4rem; }
+    .widget__price { margin-bottom: .2rem; }
+    .widget--arrow { order: 3; flex: 1 1 calc(50% - 4px); height: 3.25rem; font-size: 1.25rem; }
+  }
+}
+
+@layer components {
+  /* ── type roles ── */
+  .t-display   { font-size: var(--fs-display);   line-height: var(--lh-display);   letter-spacing: var(--ls-display);   font-weight: var(--w-ui); }
+  .t-statement { font-size: var(--fs-statement); line-height: var(--lh-statement); letter-spacing: var(--ls-statement); font-weight: var(--w-ui); }
+  .t-price     { font-size: var(--fs-price);     line-height: var(--lh-price);     letter-spacing: var(--ls-price);     font-weight: var(--w-ui); font-variant-numeric: tabular-nums; }
+  .t-body      { font-size: var(--fs-body);      line-height: var(--lh-body);      letter-spacing: var(--ls-body);      font-weight: var(--w-text); }
+  .t-body-sm   { font-size: var(--fs-body-sm);   line-height: var(--lh-body-sm);   letter-spacing: var(--ls-body);      font-weight: var(--w-text); }
+  .t-ui        { font-size: var(--fs-ui);        line-height: var(--lh-ui);        letter-spacing: var(--ls-ui);        font-weight: var(--w-ui); }
+  .t-caption   { font-size: var(--fs-caption);   line-height: var(--lh-caption);   letter-spacing: var(--ls-caption);   font-weight: var(--w-ui); }
+  .is-dim { color: var(--ink-55); }
+  .text-trim { text-box: trim-both cap alphabetic; }
+
+  .link-dim { transition: opacity var(--dur-tap); }
+  @media (hover: hover) and (pointer: fine) { .link-dim:hover { opacity: .6; } }
+
+  /* ── buttons: fills only, no strokes. --ink is solid and inverts with --pol;
+        --soft is the light grey of the white screens; --glass over blur. ── */
+  .btn {
+    position: relative;
+    display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+    height: var(--btn-h); padding-inline: 1.25rem;
+    border-radius: var(--radius);
+    font-size: var(--fs-ui); font-weight: var(--w-ui); letter-spacing: var(--ls-ui); line-height: 1;
+    white-space: nowrap; color: var(--ink);
+    transition: background-color var(--dur-tap) var(--ease-magic), color var(--dur-tap) var(--ease-magic), transform .15s var(--ease-out);
+  }
+  .btn--ink   { background: var(--ink); color: var(--plate); }
+  .btn--soft  { background: var(--soft); color: var(--k); }
+  .btn--glass { background: var(--glass); -webkit-backdrop-filter: blur(var(--glass-blur)); backdrop-filter: blur(var(--glass-blur)); }
+  .btn--icon  { width: var(--btn-h); padding: 0; }
+  .btn .bi { font-size: 1.2em; line-height: 1; display: inline-flex; }
+  @media (hover: hover) and (pointer: fine) {
+    .btn--ink:hover   { background: color-mix(in srgb, var(--ink) 86%, var(--plate)); }
+    .btn--soft:hover  { background: #e8e8e8; }
+    .btn--glass:hover { background: var(--glass-hover); }
+  }
+  .btn:active { transform: scale(.97); }
+
+  /* ── pill: small glass label with an icon ── */
+  .pill {
+    display: inline-flex; align-items: center; gap: .4em;
+    height: 2rem; padding-inline: .8em;
+    border-radius: 999px;
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(var(--glass-blur)); backdrop-filter: blur(var(--glass-blur));
+    white-space: nowrap;
+  }
+  .pill .bi { font-size: .95em; }
+
+  @supports (corner-shape: squircle) { .btn, .widget { corner-shape: squircle; } }
+
+  /* ── logo marquee: the track is duplicated ×2 by lib/marquee.js and slides
+        0 → −50% at a constant 40px/s (CSS animation, off the main thread); the
+        edges fade through a mask; it runs only while in view. ── */
+  .marquee { overflow: hidden; padding-block: 1.5rem;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+  .marquee__track { display: flex; width: max-content; gap: var(--marquee-gap, 5.5rem); padding-right: var(--marquee-gap, 5.5rem);
+    animation: marquee var(--marquee-dur, 40s) linear infinite; animation-play-state: paused; will-change: transform; }
+  .marquee.is-inview .marquee__track { animation-play-state: running; }
+  .marquee__item { color: var(--ink-40); white-space: nowrap; display: inline-flex; align-items: center; gap: .4em; letter-spacing: -.01em; }
+  .marquee__item .bi { font-size: 1.1em; }
+  @keyframes marquee { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
+
+  /* ── header ── */
+  .header { position: fixed; inset-inline: 0; top: 0; z-index: var(--z-header); pointer-events: none; color: var(--ink); }
+  .header__bar {
+    display: flex; align-items: center; gap: 2rem;
+    padding: 1.6rem var(--pad-x);
+    pointer-events: auto;
+  }
+  .header__logo { display: inline-flex; align-items: center; gap: .7rem; font-size: 1.375rem; letter-spacing: -.02em; }
+  .header__mark { width: .75em; height: 1em; fill: currentColor; }
+  .header__emblem { width: 2.5rem; height: 2.5rem; border-radius: 999px; object-fit: contain; flex: 0 0 auto; }
+  .header__nav { display: flex; align-items: center; gap: 2rem; margin-left: auto; margin-right: clamp(3rem, 8vw, 8.5rem); }
+  .header__ghost { color: var(--ink-40); margin-right: clamp(2rem, 5vw, 5rem); }
+  .header__menu { display: none; }
+  @media (max-width: 47.99rem) {
+    .header__nav { display: none; }
+    .header__bar { gap: .5rem; }
+    .header__cta { margin-left: auto; }
+    .header__menu { display: inline-flex; }
+  }
+
+  /* hidden until lib/hero.js starts the intro (no flash of the rested state);
+     without JS everything is simply visible */
+  html.js .header, html.js .hero { visibility: hidden; }
+}
+
+@layer motion {
+  /* ── hero: two independent 0→1 props per element. --in is timed (the intro,
+        GSAP), --out is scrubbed (lib/hero.js); they meet only here in CSS, so
+        an early scroll never fights the intro. Blur only under .is-anim. ── */
+  [data-hero-ui], [data-hero-title] { --in: 1; --out: 0; }
+  html.js [data-hero-ui], html.js [data-hero-title] { --in: 0; }
+
+  [data-hero-ui] {
+    opacity: calc(var(--in) * (1 - var(--out)));
+    translate: 0 calc((1 - var(--in)) * 1.25rem - var(--out) * 1em);
+  }
+  [data-hero-ui].is-anim { filter: blur(calc((1 - var(--in)) * 8px)); }
+
+  [data-hero-title] {
+    opacity: calc(var(--in) * (1 - var(--out)));
+    translate: 0 calc((1 - var(--in)) * .2em - var(--out) * 4svh);
+  }
+  [data-hero-title].is-anim { filter: blur(calc((1 - var(--in)) * 14px + var(--out) * 16px)); }
+
+  /* header entrance (lib/header.js) writes transform/opacity through GSAP — no CSS here */
+
+  /* ── screen 2: everything carries --in (rises in as the pin parks) and --out
+        (leaves before the pin unsticks). Statement lines rise out of their masks
+        one after another (--line from SplitText); the exit is a block fade + lift +
+        blur, gated by .is-anim. Small UI: no blur, ever. ── */
+  [data-about-in] { --in: 0; --out: 0; --in-y: 20svh; }
+  html:not(.js) [data-about-in] { --in: 1; }
+  [data-about-in]:not(.about__statement) {
+    opacity: calc(clamp(0, var(--in) / .6, 1) * (1 - var(--out)));
+    translate: 0 calc((1 - var(--in)) * var(--in-y) - var(--out) * 1.5rem);
+  }
+  .about__statement {
+    opacity: calc(1 - var(--out));
+    translate: 0 calc(0px - var(--out) * 2rem);
+  }
+  .about__statement.is-anim { filter: blur(calc(var(--out) * 10px)); }
+  .about__statement .line {
+    --li: clamp(0, calc((var(--in) * 1.5 - (var(--line, 1) - 1) * .14) / 1), 1);
+    translate: 0 calc((1 - var(--li)) * 1.15em);
+    opacity: var(--li);
+  }
+  .about__marquee { --in-y: 14svh; }
+
+  /* ── screen 3: the last frame dissolves into the cut-out (blur both ways, only
+        while .is-dissolving); the neighbours blur in while the row forms. ── */
+  .media.is-dissolving .media__video { filter: blur(calc(var(--dis) * 24px)); }
+  .media.is-dissolving .media__cut   { filter: blur(calc((1 - var(--dis)) * 12px)); }
+  .row.is-anim .car:not(.media)      { filter: blur(calc((1 - var(--rin)) * 12px)); }
+
+  /* words: --p sweeps the statement; word i (1-based, --word from SplitText) owns
+     the window [(i−1), (i+1)] of p·(n+1) — overlapping halves, animos.app mechanic,
+     no transition: it tracks the finger. --out fades the whole block. */
+  [data-words] { --p: 0; --out: 0; --n: 20; opacity: calc(1 - var(--out)); translate: -50% calc(-50% - var(--out) * 16px); }
+  [data-words].is-anim { filter: blur(calc(var(--out) * 10px)); }
+  [data-words] .word {
+    --w: clamp(0, calc((var(--p) * (var(--n) + 1) - (var(--word, 1) - 1)) / 2), 1);
+    opacity: calc(.12 + .88 * var(--w));
+    translate: 0 calc((1 - var(--w)) * .35em);
+  }
+  [data-words].is-words .word { filter: blur(calc((1 - var(--w)) * 8px)); }
+  [data-words].is-hidden { visibility: hidden; }
+
+  /* ── screen 4: neighbours fade + blur while the centre grows (vis from setCur);
+        widgets rise 140% from below, one after another by --i. ── */
+  .car.is-anim { filter: blur(calc((1 - var(--vis)) * 6px)); }
+  .about__marquee { translate: 0 calc((1 - var(--in)) * var(--in-y) + var(--out) * 1.5rem); }
+
+  /* ── class-contract reveals (new-12/13), for the sections that follow ── */
+  .reveal-lines:where(html.js *) { opacity: 0; }
+  .reveal-lines.is-inview { opacity: 1; }
+  .reveal-lines .line {
+    translate: 0 1em; opacity: 0;
+    transition-property: translate, transform, opacity;
+    transition-duration: var(--dur-line);
+    transition-timing-function: var(--ease-magic);
+  }
+  .reveal-lines.is-inview .line { translate: 0 0; opacity: 1; transition-delay: calc((var(--line, 0) + var(--line-offset, 0)) * var(--step-line)); }
+
+  .reveal-words:where(html.js *) { opacity: 0; }
+  .reveal-words.is-inview { opacity: 1; }
+  .reveal-words .word { transition: var(--dur-word) var(--ease-out-expo) transform; transition-delay: calc(var(--step-word) * var(--word, 0)); transform: translateY(130%); }
+  .reveal-words.is-inview .word { transform: translateY(0%); }
+
+  /* SplitText masks */
+  .line-mask { display: block; }
+  .char-mask, .word-mask, .line, .word, .char { display: inline-block; }
+  .word-mask, .char-mask { padding-right: var(--split-mask-pad); margin-right: calc(var(--split-mask-pad) * -1); }
+  .line-mask, .word-mask, .char-mask { clip-path: inset(calc(var(--split-mask-bleed-y) * -1) 0); overflow: visible !important; }
+
+  .inview-fade { opacity: 0; transition: opacity var(--dur-tap); }
+  .inview-fade.is-inview { opacity: 1; }
+}
+
+@layer utilities {
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+
+/* Reduced motion: everything rests in its final state; lib/*.js skips the intro,
+   the scrub and the snap. */
+@media (prefers-reduced-motion: reduce) {
+  [data-hero-ui], [data-hero-title] { --in: 1 !important; --out: 0 !important; filter: none !important; translate: none !important; }
+  [data-about-in] { --in: 1 !important; --out: 0 !important; filter: none !important; translate: none !important; }
+  [data-words] { --p: 1 !important; --out: 0 !important; filter: none !important; }
+  [data-words] .word { filter: none !important; translate: none !important; opacity: 1 !important; }
+  .media__video, .media__cut, .car { filter: none !important; }
+  .widget { translate: none !important; opacity: 1 !important; }
+  .about__statement .line { translate: none !important; opacity: 1 !important; }
+  .marquee__track { animation: none !important; }
+  .reveal-lines .line, .reveal-words .word { transition: none; translate: 0 0; transform: none; opacity: 1; }
+  .reveal-lines:where(html.js *), .reveal-words:where(html.js *) { opacity: 1; }
+  .btn, .link-dim { transition: none; }
+  html.js .header, html.js .hero { visibility: visible; }
+}
